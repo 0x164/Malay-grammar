@@ -79,10 +79,25 @@ button {
   backdrop-filter: blur(10px);
 }
 
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .brand,
 .icon-button {
   background: transparent;
   border: 0;
+}
+
+.lang-button {
+  width: auto;
+  min-width: 40px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: 600 12px "DM Mono", monospace;
+  letter-spacing: 0.04em;
 }
 
 .brand {

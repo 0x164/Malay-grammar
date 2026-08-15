@@ -15,19 +15,23 @@
     <div class="site-shell">
       <header class="topbar">
         <button class="brand" data-action="home" aria-label="Go to course home">
-          <span class="brand-dot"></span><span>Malay, plainly</span>
+          <span class="brand-dot"></span><span id="brand-label">Malay, plainly</span>
         </button>
-        <button class="icon-button" id="theme-toggle" aria-label="Toggle colour theme">◐</button>
+        <div class="topbar-actions">
+          <button class="icon-button lang-button" id="lang-toggle" type="button" aria-label="Switch interface language">RU</button>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle colour theme">◐</button>
+        </div>
       </header>
 
       <main id="app" tabindex="-1"></main>
 
       <nav class="bottom-nav" aria-label="Main navigation">
-        <button class="nav-item active" data-action="home"><span>⌂</span>Course</button>
-        <button class="nav-item" data-action="patterns"><span>⌘</span>Patterns</button>
-        <button class="nav-item" data-action="review"><span>↻</span>Review</button>
+        <button class="nav-item active" data-action="home"><span>⌂</span><span data-nav-label="course">Course</span></button>
+        <button class="nav-item" data-action="patterns"><span>⌘</span><span data-nav-label="patterns">Patterns</span></button>
+        <button class="nav-item" data-action="review"><span>↻</span><span data-nav-label="review">Review</span></button>
       </nav>
     </div>
+    <script src="i18n.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

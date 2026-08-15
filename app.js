@@ -1,48 +1,33 @@
 (() => {
   const STORAGE_KEY = "malay-plainly-v1";
   const THEME_KEY = "malay-plainly-theme";
+  const LANG_KEY = "malay-plainly-lang";
+  const I18n = window.MalayI18n;
 
   const state = {
     view: "home",
     lessonId: null,
     tab: "rule",
     progress: loadProgress(),
+    lang: loadLang(),
   };
 
-  const modules = [
-    {
-      id: "m0",
-      label: "Block 0 · Asas",
-      title: "The bones of a Malay sentence",
-      blurb:
-        "Word order, pronouns, and the particles that do most of the work. Get these automatic before anything else sticks.",
-      level: "A1 · 8 topics",
-    },
-    {
-      id: "m1",
-      label: "Block 1 · Kata kerja",
-      title: "Verbs without conjugation theatre",
-      blurb:
-        "Malay verbs do not change for person or tense the way European ones do. Affixes and time words carry the load.",
-      level: "A1–A2 · 7 topics",
-    },
-    {
-      id: "m2",
-      label: "Block 2 · Imbuhan",
-      title: "Prefixes that reshape meaning",
-      blurb:
-        "me-, ber-, ter-, pe-, di- — once you hear the pattern, new vocabulary stops feeling random.",
-      level: "A2 · 6 topics",
-    },
-    {
-      id: "m3",
-      label: "Block 3 · Luas",
-      title: "From sentence to speech",
-      blurb:
-        "Questions, negation, classifiers, possessives, and the small words that make Malay sound natural.",
-      level: "A2–B1 · 7 topics",
-    },
-  ];
+  function loadLang() {
+    const saved = localStorage.getItem(LANG_KEY);
+    return saved === "ru" || saved === "en" ? saved : "en";
+  }
+
+  function t(key) {
+    return I18n.ui[state.lang][key] || I18n.ui.en[key] || key;
+  }
+
+  function pick(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    return value[state.lang] || value.en || "";
+  }
+
+  const modules = I18n.modules;
 
   const lessons = [
     // —— Block 0 ——
@@ -993,53 +978,59 @@
   const patterns = [
     {
       id: "svo",
-      label: "SVO",
       build: (w) => (w ? `${cap(w)} makan nasi.` : "Saya makan nasi."),
-      why: "Subject + verb + object. Swap the subject; the verb stays put.",
     },
     {
       id: "ada",
-      label: "Ada…",
       build: (w) => (w ? `Ada ${w} ke?` : "Ada air ke?"),
-      why: "Ada asks whether something exists or is available.",
     },
     {
       id: "nak",
-      label: "Nak + verb",
       build: (w) => (w ? `Saya nak ${w}.` : "Saya nak pergi."),
-      why: "Intention without conjugating the verb.",
     },
     {
       id: "sudah",
-      label: "Sudah + verb",
       build: (w) => (w ? `Saya sudah ${w}.` : "Saya sudah makan."),
-      why: "Completed aspect sits before the unchanged verb.",
     },
     {
       id: "tidak",
-      label: "Tidak + adj/verb",
       build: (w) => (w ? `Saya tidak ${w}.` : "Saya tidak lapar."),
-      why: "Tidak for verbs and adjectives — not for noun identity.",
     },
     {
       id: "bukan",
-      label: "Bukan + noun",
       build: (w) => (w ? `Ini bukan ${w}.` : "Ini bukan rumah saya."),
-      why: "Bukan denies what something is.",
     },
     {
       id: "ke",
-      label: "Ke + place",
       build: (w) => (w ? `Saya pergi ke ${w}.` : "Saya pergi ke pasar."),
-      why: "Ke marks direction toward a place.",
     },
     {
       id: "yang",
-      label: "Noun + yang…",
       build: (w) => (w ? `Orang yang ${w} kawan saya.` : "Orang yang duduk situ kawan saya."),
-      why: "Yang hooks a description onto a noun.",
     },
   ];
+
+  function patternMeta(id) {
+    return I18n.patterns.find((p) => p.id === id) || { label: { en: id, ru: id }, why: { en: "", ru: "" } };
+  }
+
+  function localizedLesson(lesson) {
+    if (!lesson) return null;
+    if (state.lang === "en") return lesson;
+    const ru = I18n.lessons[lesson.id];
+    if (!ru) return lesson;
+    return {
+      ...lesson,
+      subtitle: ru.subtitle || lesson.subtitle,
+      rule: ru.rule || lesson.rule,
+      text: ru.text || lesson.text,
+      tasks: lesson.tasks.map((task, i) => ({
+        ...task,
+        q: ru.tasks?.[i]?.q || task.q,
+        choices: ru.tasks?.[i]?.choices || task.choices,
+      })),
+    };
+  }
 
   function loadProgress() {
     try {
@@ -1051,6 +1042,10 @@
 
   function saveProgress() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+  }
+
+  function saveLang() {
+    localStorage.setItem(LANG_KEY, state.lang);
   }
 
   function cap(s) {
@@ -1086,7 +1081,25 @@
     });
   }
 
+  function syncChrome() {
+    document.documentElement.lang = state.lang === "ru" ? "ru" : "en";
+    document.title = t("brand");
+    const brand = document.getElementById("brand-label");
+    if (brand) brand.textContent = t("brand");
+    document.querySelectorAll("[data-nav-label]").forEach((el) => {
+      el.textContent = t(el.dataset.navLabel);
+    });
+    const langBtn = document.getElementById("lang-toggle");
+    if (langBtn) {
+      langBtn.textContent = t("langShort");
+      langBtn.setAttribute("aria-label", t("langToggle"));
+    }
+    const themeBtn = document.getElementById("theme-toggle");
+    if (themeBtn) themeBtn.setAttribute("aria-label", t("themeToggle"));
+  }
+
   function render() {
+    syncChrome();
     const app = document.getElementById("app");
     if (state.view === "home") {
       setNav("home");
@@ -1115,16 +1128,17 @@
     const done = doneCount();
     const total = lessons.length;
     const pct = Math.round((done / total) * 100);
+    const doneLabel = t("ofDone").replace("{done}", done).replace("{total}", total);
     return `
-      <p class="eyebrow">Pocket course · BM grammar</p>
-      <h1>Malay, plainly</h1>
-      <p class="intro">A phone-sized path through practical Malay grammar — rules, short dialogues, and checks. Progress stays on this device.</p>
-      <div class="progress-ring" aria-label="${done} of ${total} done">${pct}%</div>
+      <p class="eyebrow">${t("pocketCourse")}</p>
+      <h1>${t("brand")}</h1>
+      <p class="intro">${t("homeIntro")}</p>
+      <div class="progress-ring" aria-label="${doneLabel}">${pct}%</div>
       <div class="quick-actions">
-        <button class="quick-action" data-action="patterns"><span class="action-icon">⌘</span><b>Pattern box</b><small>Build common frames with your own word</small></button>
-        <button class="quick-action" data-action="sheet"><span class="action-icon">☰</span><b>Cheat sheet</b><small>Particles &amp; negation on one screen</small></button>
-        <button class="quick-action" data-action="review"><span class="action-icon">↻</span><b>Review</b><small>Topics that tripped you up</small></button>
-        <button class="quick-action" data-action="about"><span class="action-icon">i</span><b>About</b><small>How to use this course</small></button>
+        <button class="quick-action" data-action="patterns"><span class="action-icon">⌘</span><b>${t("patternBox")}</b><small>${t("patternBoxHint")}</small></button>
+        <button class="quick-action" data-action="sheet"><span class="action-icon">☰</span><b>${t("cheatSheet")}</b><small>${t("cheatSheetHint")}</small></button>
+        <button class="quick-action" data-action="review"><span class="action-icon">↻</span><b>${t("review")}</b><small>${t("reviewHint")}</small></button>
+        <button class="quick-action" data-action="about"><span class="action-icon">i</span><b>${t("about")}</b><small>${t("aboutHint")}</small></button>
       </div>
       ${modules
         .map((m, mi) => {
@@ -1132,50 +1146,53 @@
           return `
           <section class="module">
             <div class="module-intro tone-${mi}">
-              <div class="module-label">${m.label} · ${m.level}</div>
-              <h2>${m.title}</h2>
-              <p>${m.blurb}</p>
+              <div class="module-label">${pick(m.label)} · ${pick(m.level)}</div>
+              <h2>${pick(m.title)}</h2>
+              <p>${pick(m.blurb)}</p>
             </div>
             <div class="lesson-list">
               ${list
-                .map(
-                  (l) => `
+                .map((l) => {
+                  const loc = localizedLesson(l);
+                  return `
                 <button class="lesson-card" data-lesson="${l.id}">
                   <span class="lesson-number">${l.id}</span>
                   <span>
                     <b>${l.title}</b>
-                    <small>${l.subtitle}</small>
+                    <small>${loc.subtitle}</small>
                   </span>
                   <span class="${state.progress[l.id]?.done ? "done" : "arrow"}">${state.progress[l.id]?.done ? "✓" : "›"}</span>
-                </button>`
-                )
+                </button>`;
+                })
                 .join("")}
             </div>
           </section>`;
         })
         .join("")}
-      <button class="next" data-action="reset-progress" style="background:transparent;color:var(--muted);border:1px solid var(--line);margin-bottom:12px">Reset progress</button>
+      <button class="next" data-action="reset-progress" style="background:transparent;color:var(--muted);border:1px solid var(--line);margin-bottom:12px">${t("resetProgress")}</button>
     `;
   }
 
   function renderLesson() {
-    const lesson = lessonById(state.lessonId);
+    const base = lessonById(state.lessonId);
+    const lesson = localizedLesson(base);
     if (!lesson) return renderHome();
     const idx = lessons.findIndex((l) => l.id === lesson.id);
     const next = lessons[idx + 1];
     const tabs = [
-      ["rule", "Rule"],
-      ["text", "Text"],
-      ["task", "Practice"],
+      ["rule", t("rule")],
+      ["text", t("text")],
+      ["task", t("practice")],
     ];
     let body = "";
     if (state.tab === "rule") body = `<div class="lesson-copy">${lesson.rule}</div>`;
     if (state.tab === "text") body = `<div class="lesson-copy">${lesson.text}</div>`;
     if (state.tab === "task") body = renderTasks(lesson);
 
+    const doneBit = state.progress[lesson.id]?.done ? ` · ${t("done")}` : "";
     return `
-      <button class="back" data-action="home">← All topics</button>
-      <div class="lesson-kicker">${lesson.id}${state.progress[lesson.id]?.done ? " · done" : ""}</div>
+      <button class="back" data-action="home">${t("allTopics")}</button>
+      <div class="lesson-kicker">${lesson.id}${doneBit}</div>
       <h1 style="font-size:34px">${lesson.title}</h1>
       <p class="intro">${lesson.subtitle}</p>
       <div class="tabs">
@@ -1189,29 +1206,29 @@
       ${body}
       ${
         next
-          ? `<button class="next" data-lesson="${next.id}" data-mark="${lesson.id}">Next · ${next.id} ${next.title}</button>`
-          : `<button class="next" data-action="home" data-mark="${lesson.id}">Back to course</button>`
+          ? `<button class="next" data-lesson="${next.id}" data-mark="${lesson.id}">${t("next")} · ${next.id} ${next.title}</button>`
+          : `<button class="next" data-action="home" data-mark="${lesson.id}">${t("backToCourse")}</button>`
       }
     `;
   }
 
   function renderTasks(lesson) {
     return lesson.tasks
-      .map((t, i) => {
+      .map((task, i) => {
         const key = `${lesson.id}:${i}`;
         const answered = state.progress[lesson.id]?.answers?.[i];
         return `
         <div class="question" style="margin-bottom:14px" data-q="${key}">
-          <h3>${t.q}</h3>
+          <h3>${task.q}</h3>
           <div class="answers">
-            ${t.choices
+            ${task.choices
               .map((c, ci) => {
                 let cls = "answer";
                 if (answered !== undefined) {
-                  if (ci === t.answer) cls += " correct";
-                  else if (ci === answered && answered !== t.answer) cls += " wrong";
+                  if (ci === task.answer) cls += " correct";
+                  else if (ci === answered && answered !== task.answer) cls += " wrong";
                 }
-                return `<button class="${cls}" data-answer="${ci}" data-lesson-q="${lesson.id}" data-qi="${i}" data-correct="${t.answer}" ${answered !== undefined ? "disabled" : ""}>${c}</button>`;
+                return `<button class="${cls}" data-answer="${ci}" data-lesson-q="${lesson.id}" data-qi="${i}" data-correct="${task.answer}" ${answered !== undefined ? "disabled" : ""}>${c}</button>`;
               })
               .join("")}
           </div>
@@ -1221,57 +1238,59 @@
   }
 
   function renderPatterns() {
+    const firstMeta = patternMeta(patterns[0].id);
     return `
-      <button class="back" data-action="home">← All topics</button>
-      <p class="eyebrow">Toolkit</p>
-      <h1 style="font-size:34px">Pattern box</h1>
-      <p class="intro">Type a Malay word or short phrase, then tap a frame. Say your guess aloud before you look.</p>
+      <button class="back" data-action="home">${t("allTopics")}</button>
+      <p class="eyebrow">${t("toolkit")}</p>
+      <h1 style="font-size:34px">${t("patternTitle")}</h1>
+      <p class="intro">${t("patternIntro")}</p>
       <div class="pattern-tool">
-        <label for="pattern-input">Your word</label>
-        <input id="pattern-input" type="text" placeholder="e.g. tidur, sekolah, lapar" autocomplete="off" />
+        <label for="pattern-input">${t("yourWord")}</label>
+        <input id="pattern-input" type="text" placeholder="${t("patternPlaceholder")}" autocomplete="off" />
         <div id="pattern-list" style="display:grid;gap:8px;margin-top:14px">
           ${patterns
-            .map(
-              (p) =>
-                `<button class="answer" data-pattern="${p.id}" style="font-weight:600">${p.label}</button>`
-            )
+            .map((p) => {
+              const meta = patternMeta(p.id);
+              return `<button class="answer" data-pattern="${p.id}" style="font-weight:600">${pick(meta.label)}</button>`;
+            })
             .join("")}
         </div>
         <div class="pattern-result" id="pattern-result">
           <b>${patterns[0].build("")}</b>
-          <p class="meaning" style="margin:8px 0 0;color:var(--muted)">${patterns[0].why}</p>
+          <p class="meaning" style="margin:8px 0 0;color:var(--muted)">${pick(firstMeta.why)}</p>
         </div>
       </div>
     `;
   }
 
   function renderSheet() {
+    const sheet = I18n.sheet[state.lang] || I18n.sheet.en;
     return `
-      <button class="back" data-action="home">← All topics</button>
-      <p class="eyebrow">Cheat sheet</p>
-      <h1 style="font-size:34px">Particles &amp; nots</h1>
-      <p class="intro">Return here until the choices feel automatic.</p>
+      <button class="back" data-action="home">${t("allTopics")}</button>
+      <p class="eyebrow">${t("cheatSheet")}</p>
+      <h1 style="font-size:34px">${t("sheetTitle")}</h1>
+      <p class="intro">${t("sheetIntro")}</p>
       <div class="note">
-        <b>Negation</b>
-        <p style="margin:8px 0 0"><b>tidak</b> — verbs &amp; adjectives<br/><b>bukan</b> — nouns &amp; identity<br/><b>belum</b> — not yet</p>
+        <b>${t("negation")}</b>
+        <p style="margin:8px 0 0">${sheet.negationBody}</p>
       </div>
       <div class="note" style="background:color-mix(in srgb, var(--sun) 28%, var(--surface))">
-        <b>Place</b>
-        <p style="margin:8px 0 0"><b>ke</b> to · <b>di</b> at/in · <b>dari</b> from</p>
+        <b>${t("place")}</b>
+        <p style="margin:8px 0 0">${sheet.placeBody}</p>
       </div>
       <div class="example">
-        <div class="example-label">Aspect helpers</div>
+        <div class="example-label">${sheet.aspectLabel || t("aspectHelpers")}</div>
         <p class="malay">sudah · sedang · akan · baru · pernah</p>
-        <p class="meaning">done · in progress · will · just · ever</p>
+        <p class="meaning">${sheet.aspectMeaning || t("aspectMeaning")}</p>
       </div>
       <div class="example">
-        <div class="example-label">Pronoun quick cut</div>
+        <div class="example-label">${sheet.pronounLabel || t("pronounCut")}</div>
         <p class="malay">saya / aku · awak · dia · kami / kita · mereka</p>
-        <p class="meaning">kami excludes you · kita includes you</p>
+        <p class="meaning">${sheet.pronounMeaning || t("pronounMeaning")}</p>
       </div>
       <div class="example">
-        <div class="example-label">meN- nasal hint</div>
-        <p class="meaning">b → mem- · t/c/d/j → men- · k/g/h/a… → meng- · s → meny- · l/m/n/r/w/y → me-</p>
+        <div class="example-label">${sheet.menLabel || t("menHint")}</div>
+        <p class="meaning">${sheet.menBody || t("menHint")}</p>
       </div>
     `;
   }
@@ -1282,42 +1301,48 @@
       .sort((a, b) => (state.progress[b.id].wrong || 0) - (state.progress[a.id].wrong || 0));
     if (!hard.length) {
       return `
-        <button class="back" data-action="home">← All topics</button>
+        <button class="back" data-action="home">${t("allTopics")}</button>
         <div class="empty">
-          <h2>Nothing to review yet</h2>
-          <p>Miss a practice answer and it will show up here.</p>
+          <h2>${t("reviewEmptyTitle")}</h2>
+          <p>${t("reviewEmptyBody")}</p>
         </div>`;
     }
     return `
-      <button class="back" data-action="home">← All topics</button>
-      <p class="eyebrow">Worth another pass</p>
-      <h1 style="font-size:34px">Review</h1>
+      <button class="back" data-action="home">${t("allTopics")}</button>
+      <p class="eyebrow">${t("reviewEyebrow")}</p>
+      <h1 style="font-size:34px">${t("reviewTitle")}</h1>
       <div class="lesson-list" style="border-radius:16px;border:1px solid var(--line)">
         ${hard
-          .map(
-            (l) => `
+          .map((l) => {
+            const n = state.progress[l.id].wrong;
+            const missLabel = `${n} ${n > 1 ? t("misses") : t("miss")}`;
+            return `
           <button class="lesson-card" data-lesson="${l.id}">
             <span class="lesson-number">${l.id}</span>
-            <span><b>${l.title}</b><small>${state.progress[l.id].wrong} miss${state.progress[l.id].wrong > 1 ? "es" : ""}</small></span>
+            <span><b>${l.title}</b><small>${missLabel}</small></span>
             <span class="arrow">›</span>
-          </button>`
-          )
+          </button>`;
+          })
           .join("")}
       </div>
     `;
   }
 
   function renderAbout() {
+    const labels =
+      state.lang === "ru"
+        ? { what: "Что это.", who: "Кому подходит.", each: "Каждая тема.", how: "Как заниматься." }
+        : { what: "What it is.", who: "Who it suits.", each: "Each topic.", how: "How to study." };
     return `
-      <button class="back" data-action="home">← All topics</button>
-      <p class="eyebrow">About</p>
-      <h1 style="font-size:34px">How this works</h1>
+      <button class="back" data-action="home">${t("allTopics")}</button>
+      <p class="eyebrow">${t("aboutEyebrow")}</p>
+      <h1 style="font-size:34px">${t("aboutTitle")}</h1>
       <div class="lesson-copy">
-        <p><b>What it is.</b> An offline-friendly Malay grammar course for phones. Progress lives in your browser storage and is not sent anywhere.</p>
-        <p><b>Who it suits.</b> Learners who can read Latin script and want sentence patterns before long vocabulary lists.</p>
-        <p><b>Each topic</b> has three tabs: Rule, Text, Practice. Follow the numbered order — later blocks lean on earlier ones.</p>
-        <p><b>How to study.</b> Use Next at the bottom. Do not skip the dialogues. Open the Pattern box when a frame feels shaky. Reset progress from the home screen if you want a clean run.</p>
-        <p style="color:var(--muted);font-size:14px">Built for GitHub Pages · Malay, plainly · 2026</p>
+        <p><b>${labels.what}</b> ${t("aboutWhat")}</p>
+        <p><b>${labels.who}</b> ${t("aboutWho")}</p>
+        <p><b>${labels.each}</b> ${t("aboutEach")}</p>
+        <p><b>${labels.how}</b> ${t("aboutHow")}</p>
+        <p style="color:var(--muted);font-size:14px">${t("aboutFooter")}</p>
       </div>
     `;
   }
@@ -1337,7 +1362,7 @@
         else if (a === "about") state.view = "about";
         else if (a === "sheet") state.view = "sheet";
         else if (a === "reset-progress") {
-          if (confirm("Clear all progress on this device?")) {
+          if (confirm(t("clearProgressConfirm"))) {
             state.progress = {};
             saveProgress();
           }
@@ -1376,7 +1401,7 @@
         state.progress[id] = { ...prev, answers };
         if (chosen !== correct) markWrong(id);
         else saveProgress();
-        const allRight = lessonById(id).tasks.every((t, i) => answers[i] === t.answer);
+        const allRight = lessonById(id).tasks.every((task, i) => answers[i] === task.answer);
         if (allRight) markDone(id);
         render();
       });
@@ -1386,10 +1411,11 @@
     root.querySelectorAll("[data-pattern]").forEach((el) => {
       el.addEventListener("click", () => {
         const p = patterns.find((x) => x.id === el.dataset.pattern);
+        const meta = patternMeta(el.dataset.pattern);
         const word = (input?.value || "").trim();
         const box = document.getElementById("pattern-result");
         if (box && p) {
-          box.innerHTML = `<b>${p.build(word)}</b><p class="meaning" style="margin:8px 0 0;color:var(--muted)">${p.why}</p>`;
+          box.innerHTML = `<b>${p.build(word)}</b><p class="meaning" style="margin:8px 0 0;color:var(--muted)">${pick(meta.why)}</p>`;
         }
       });
     });
@@ -1400,10 +1426,16 @@
   const savedTheme = localStorage.getItem(THEME_KEY);
   if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
   themeToggle?.addEventListener("click", () => {
-    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    if (next === "light") document.documentElement.removeAttribute("data-theme");
+    const nextTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    if (nextTheme === "light") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", "dark");
-    localStorage.setItem(THEME_KEY, next === "light" ? "" : "dark");
+    localStorage.setItem(THEME_KEY, nextTheme === "light" ? "" : "dark");
+  });
+
+  document.getElementById("lang-toggle")?.addEventListener("click", () => {
+    state.lang = state.lang === "en" ? "ru" : "en";
+    saveLang();
+    render();
   });
 
   document.querySelectorAll(".brand, .nav-item").forEach((el) => {
