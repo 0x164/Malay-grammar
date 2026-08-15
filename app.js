@@ -1432,14 +1432,17 @@
     localStorage.setItem(THEME_KEY, nextTheme === "light" ? "" : "dark");
   });
 
-  document.getElementById("lang-toggle")?.addEventListener("click", () => {
+  document.getElementById("lang-toggle")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     state.lang = state.lang === "en" ? "ru" : "en";
     saveLang();
     render();
   });
 
   document.querySelectorAll(".brand, .nav-item").forEach((el) => {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", (event) => {
+      if (event.target.closest("#lang-toggle, #theme-toggle, .topbar-actions")) return;
       const a = el.dataset.action;
       if (!a) return;
       state.view = a === "home" ? "home" : a;
